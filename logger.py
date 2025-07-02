@@ -24,3 +24,5 @@ def setup_logger(name='logger', log_file=LOG_FILE, level=level):
         logger.addHandler(handler)
 
     return logger
+
+logger = setup_logger()

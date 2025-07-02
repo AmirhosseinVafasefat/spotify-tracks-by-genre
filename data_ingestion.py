@@ -1,4 +1,4 @@
-from spotify_api import search_artists_by_genre, get_albums_by_artist, get_album_information, get_tracks_by_album, get_track_information, get_several_albums_tracks, get_several_track_information
+from spotify_api import search_artists_by_genre, get_albums_by_artist, get_several_albums_tracks, get_several_track_information
 from models import Artist, Album, Track
 from dao import dao_get_all_artists, dao_save_artist, dao_get_all_albums, dao_save_album, dao_get_all_tracks, dao_save_track, dao_update_album, dao_update_track
 from tqdm import tqdm
@@ -62,40 +62,6 @@ def parallel_extract_albums(headers: str, max_results: int, results_per_page: in
                 )
                 dao_save_album(album_instance)
 
-# def extract_albums(headers: str, max_results: int, results_per_page: int) -> None:
-#     print("Extracting albums of the artists in the data base.")
-#     for artist in tqdm(dao_get_all_artists()):
-#         for offset in tqdm(range (0, max_results, results_per_page), leave=False, colour="yellow"):
-#             albums = get_albums_by_artist(headers, artist.spotify_id, results_per_page, offset)
-
-#             if not albums:
-#                 continue
-
-#             for album in albums:
-#                 artists = album["artists"]
-#                 album_artists = ""
-#                 for item in artists:
-#                     if item == artists[0]:
-#                         album_artists = album_artists + f"{item['name']}"
-#                     else:
-#                         album_artists = album_artists + f", {item['name']}"
-
-#                 album_instance = Album(
-#                     spotify_id = album["id"],
-#                     title = album["name"],
-#                     tracks= 0,
-#                     artists = album_artists,
-#                     popularity = 0
-#                 )
-#                 dao_save_album(album_instance)
-
-# def extract_albums_popularity(headers: str, field_override: bool = False) -> None:
-#     for album in tqdm(dao_get_all_albums()):
-#         if (album.popularity == 0) or field_override:
-#             info = get_album_information(headers, album.spotify_id)
-#             album.popularity = info["popularity"]
-#             dao_update_album(album)
-
 def extract_tracks_by_albums(headers: str) -> None:
     all_albums = dao_get_all_albums()
     albums_ids = []
@@ -118,17 +84,6 @@ def extract_tracks_by_albums(headers: str) -> None:
         tqdm(albums_ids)
     )
     
-    # for i in range(0, len(all_albums), N_SEVERAL_ALBUMS):
-    #     albums_ids_str = ""
-    #     temp_album_list = all_albums[i:N_SEVERAL_ALBUMS]
-    #     for album in temp_album_list:
-    #         if albums_ids_str == "":
-    #             albums_ids_str = albums_ids_str +  album.spotify_id
-    #         else:
-    #             albums_ids_str = albums_ids_str + "," + album.spotify_id
-
-    #     albums_json = get_several_albums_tracks(headers, albums_ids_str)
-
     for album_json in albums_json[0]:
         dao_update_album(album_json["id"], album_json["popularity"], album_json["tracks"]["total"])
 
@@ -152,37 +107,7 @@ def extract_tracks_by_albums(headers: str) -> None:
                 album_spotify_id = album_json["id"],
                 artists = track_artists
             )
-            dao_save_track(track_instance)
-
-# def extract_tracks_information(headers: str, max_results: int, results_per_page: int) -> None:
-#     print("Extracting track of the albums in the data base.")
-#     for album in dao_get_all_albums():
-#         for offset in range (0, max_results, results_per_page):
-#             tracks = get_tracks_by_album(headers, album.spotify_id, results_per_page, offset)
-
-#             if not tracks:
-#                 continue
-
-#             for track in tracks:
-
-#                 artists = track["artists"]
-#                 track_artists = ""
-#                 for artist in artists:
-#                     if artist == artists[0]:
-#                         track_artists = track_artists + f"{artist['name']}"
-#                     else:
-#                         track_artists = track_artists + f", {artist['name']}"
-                
-#                 track_instance = Track(
-#                     spotify_id = track["id"],
-#                     title = track["name"],
-#                     popularity = 0,
-#                     duration_ms = track["duration_ms"],
-#                     album_title = "",
-#                     album_spotify_id = "",
-#                     artists = track_artists
-#                 )
-#                 dao_save_track(track_instance) 
+            dao_save_track(track_instance) 
 
 def extract_several_tracks_info(headers:str) -> None:
     all_tracks = dao_get_all_tracks()
@@ -207,20 +132,3 @@ def extract_several_tracks_info(headers:str) -> None:
 
     for track_json in tracks_json[0]:
         dao_update_track(track_json["id"], track_json["popularity"])
-
-# def extract_tracks_other_details(headers: str, field_override: bool = False) -> None:
-#     for track in tqdm(dao_get_all_tracks()):
-#         if (track.popularity == 0) or field_override:
-#             info = get_track_information(headers, track.spotify_id)
-
-#             if info["album"]["album_type"] == "Single":
-#                 album_title = "Single"
-#                 album_spotify_id = "N/A"
-#             else:
-#                 album_title = info["album"]["name"]
-#                 album_spotify_id = info["album"]["id"]
-
-#             track.popularity = info["popularity"]
-#             track.album_title = album_title
-#             track.album_spotify_id = album_spotify_id
-#             dao_update_track(track)

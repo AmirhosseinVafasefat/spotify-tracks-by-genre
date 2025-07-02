@@ -2,11 +2,9 @@ import json
 import time
 import requests
 from requests.exceptions import SSLError, ConnectionError, Timeout
-from logger import setup_logger
 
+from logger import logger
 from config import MAX_RETIRES, RETRY_BACKOFF
-
-logger = setup_logger()
 
 def error_handling(headers: str, url: str, error_message: str = "", retries: int = MAX_RETIRES, backoff: int = RETRY_BACKOFF) -> dict:
     for attempt in range(retries):
@@ -56,27 +54,6 @@ def get_albums_by_artist(headers:str, artist_id:str, results_per_page:int, offse
     response = error_handling(headers, query_url, f"artist id: {artist_id}")
 
     return response["items"]
-
-def get_album_information(headers:str, album_id:str) -> dict:
-    url = f"https://api.spotify.com/v1/albums/{album_id}"
-    response = error_handling(headers, url)
-
-    return response
-
-def get_tracks_by_album(headers:str, album_id:str, results_per_page:int, offset:int) -> list:
-    url = f"https://api.spotify.com/v1/albums/{album_id}/tracks"
-    query = f"?limit={results_per_page}&offset={offset}"
-    query_url = url + query
-
-    response= error_handling(query_url, headers=headers)
-
-    return response["items"]
-
-def get_track_information(headers:str, track_id:str) -> dict:
-    url = f"https://api.spotify.com/v1/tracks/{track_id}"
-    response = error_handling(headers, url)
-
-    return response
 
 def get_several_albums_tracks(headers:str, albums_ids:str) -> list:
     url = "https://api.spotify.com/v1/albums"
