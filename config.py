@@ -1,7 +1,7 @@
 GENRE_QUERY = "Iranian Rap" #query for music genre 
 
-MAX_RESULTS = 3 #1000 is the maximum amount the spotify api allows
-RESULTS_PER_PAGE = 3 #50 is the maximum amount the spotify api allows
+MAX_RESULTS = 1 #1000 is the maximum amount the spotify api allows
+RESULTS_PER_PAGE = 1 #50 is the maximum amount the spotify api allows
 
 MAX_RETIRES = 3 #number of retiries for each api request 
 RETRY_BACKOFF = 3 #seconds to wait for retrying

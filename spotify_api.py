@@ -12,7 +12,6 @@ def error_handling(headers: str, url: str, error_message: str = "", retries: int
     for attempt in range(retries):
         try:
             response = requests.get(url, headers=headers, timeout=10)
-            print(response)
             if response.status_code == 429:
                 retry_after = int(response.headers.get("Retry-After", 5))
                 logger.warning(f"[Rate limited] Waiting {retry_after}s. {error_message}")

@@ -206,7 +206,7 @@ def extract_several_tracks_info(headers:str) -> None:
     )
 
     for track_json in tracks_json[0]:
-        dao_update_album(tracks_json["id"], tracks_json["popularity"])
+        dao_update_track(track_json["id"], track_json["popularity"])
 
 # def extract_tracks_other_details(headers: str, field_override: bool = False) -> None:
 #     for track in tqdm(dao_get_all_tracks()):
