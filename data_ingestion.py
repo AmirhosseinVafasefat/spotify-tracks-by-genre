@@ -1,33 +1,28 @@
-from spotify_api import search_artists_by_genre, get_albums_by_artist, get_several_albums_tracks, get_several_track_information
+from spotify_api import get_several_artists, search_artists, get_albums_by_artist, get_several_albums_tracks, get_several_track_information
 from models import Artist, Album, Track
 from dao import dao_get_all_artists, dao_save_artist, dao_get_all_albums, dao_save_album, dao_get_all_tracks, dao_save_track, dao_update_album, dao_update_track
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-from config import N_JOBS, N_SEVERAL_ALBUMS, N_SEVERAL_TRACKS
+from auth import SpotifyAuthManager
+from config import N_JOBS, N_SEVERAL_ALBUMS, N_SEVERAL_TRACKS, N_SEVERAL_ARTISTS
 
-def extract_artists(headers: str, genre_query: str, max_results: int, results_per_page: int) -> None:
-    for offset in tqdm(range (0, max_results, results_per_page)):
-        artists = search_artists_by_genre(headers, genre_query, results_per_page, offset)
-        if not artists:
-            continue
-
-        for artist in artists:
-            artist_instance = Artist(
-                spotify_id = artist["id"],
-                name = artist["name"],
-                popularity = artist["popularity"],
-                followers = artist["followers"]["total"]
-            )
-            dao_save_artist(artist_instance)
-            
-def parallel_extract_artists(headers: str, genre_query: str, max_results: int, results_per_page: int) -> None:
-    artists = Parallel(n_jobs=N_JOBS)(
-        delayed(search_artists_by_genre)(headers, genre_query, results_per_page, offset)
+def parallel_extract_artists(auth: SpotifyAuthManager, genre_query: str, max_results: int, results_per_page: int) -> None:
+    
+    print("Extracting artists.")
+    artists_list = Parallel(n_jobs=N_JOBS)(
+        delayed(search_artists)(auth, genre_query, results_per_page, offset)
           for offset in 
           tqdm(range (0, max_results, results_per_page))
         )
-    for artist in artists[0]:
+    
+    extracted_artists=[]
+    for list in artists_list:
+        for artist in list:
+            extracted_artists.append(artist)
+    print(f"Number of extracted artists: {len(extracted_artists)}")
+    
+    for artist in extracted_artists:
         artist_instance = Artist(
             spotify_id = artist["id"],
             name = artist["name"],
@@ -35,34 +30,72 @@ def parallel_extract_artists(headers: str, genre_query: str, max_results: int, r
             followers = artist["followers"]["total"]
         )
         dao_save_artist(artist_instance)
+    
+def parallel_extract_artist_by_id(auth: SpotifyAuthManager, artists_list: list) -> None:
+    print("Extracting artists from file.")
 
-def parallel_extract_albums(headers: str, max_results: int, results_per_page: int) -> None:
+    all_artists = artists_list
+    artists_ids = []
+
+    for i in range(0, len(all_artists), N_SEVERAL_ARTISTS):
+        artists_ids_str = ""
+        temp_artists_list = all_artists[i:i + N_SEVERAL_ARTISTS]
+        for artist in temp_artists_list:
+            if artists_ids_str == "":
+                artists_ids_str = artists_ids_str +  artist["spotify_id"]
+            else:
+                 artists_ids_str = artists_ids_str + "," +  artist["spotify_id"]
+
+        artists_ids.append(artists_ids_str)
+
+    extracted_rappers_list = Parallel(n_jobs=N_JOBS)(
+        delayed(get_several_artists)(auth, ids)
+        for ids in 
+        tqdm(artists_ids)
+        )
+    
+    for artists_batch in extracted_rappers_list:
+        for artist in artists_batch:
+            artist_instance = Artist(
+                spotify_id = artist["id"],
+                name = artist["name"],
+                popularity = artist["popularity"],
+                followers = artist["followers"]["total"]
+            )
+            dao_save_artist(artist_instance) 
+
+def parallel_extract_albums(auth:SpotifyAuthManager, max_results: int, results_per_page: int) -> None:
+    
+    print("Extracting albums.")
     artists = dao_get_all_artists()
     for artist in tqdm(artists):
-        albums = Parallel(n_jobs=N_JOBS)(
-            delayed(get_albums_by_artist)(headers, artist.spotify_id, results_per_page, offset)
+        albums_list = Parallel(n_jobs=N_JOBS)(
+            delayed(get_albums_by_artist)(auth, artist.spotify_id, results_per_page, offset)
               for offset in 
               tqdm(range (0, max_results, results_per_page), colour="yellow", leave = False))
         
-        for album in albums[0]:
-                artists = album["artists"]
-                album_artists = ""
-                for item in artists:
-                    if item == artists[0]:
-                        album_artists = album_artists + f"{item['name']}"
-                    else:
-                        album_artists = album_artists + f", {item['name']}"
+        for list in albums_list:
+            for album in list:
+                    artists = album["artists"]
+                    album_artists = ""
+                    for item in artists:
+                        if item == artists[0]:
+                            album_artists = album_artists + f"{item['name']}"
+                        else:
+                            album_artists = album_artists + f", {item['name']}"
 
-                album_instance = Album(
-                    spotify_id = album["id"],
-                    title = album["name"],
-                    tracks= 0,
-                    artists = album_artists,
-                    popularity = 0
-                )
-                dao_save_album(album_instance)
+                    album_instance = Album(
+                        spotify_id = album["id"],
+                        title = album["name"],
+                        tracks= 0,
+                        artists = album_artists,
+                        popularity = 0
+                    )
+                    dao_save_album(album_instance)
 
-def extract_tracks_by_albums(headers: str) -> None:
+def extract_tracks_by_albums(auth: SpotifyAuthManager) -> None:
+
+    print("Extracting tracks.")
     all_albums = dao_get_all_albums()
     albums_ids = []
 
@@ -78,38 +111,40 @@ def extract_tracks_by_albums(headers: str) -> None:
         albums_ids.append(albums_ids_str)
 
 
-    albums_json = Parallel(n_jobs=N_JOBS)(
-        delayed(get_several_albums_tracks)(headers, id)
+    albums_json_list = Parallel(n_jobs=N_JOBS)(
+        delayed(get_several_albums_tracks)(auth, id)
         for id in 
         tqdm(albums_ids)
     )
+    for list in albums_json_list:
+        for album_json in list:
+            dao_update_album(album_json["id"], album_json["popularity"], album_json["tracks"]["total"])
+
+            tracks = album_json["tracks"]["items"]
+            for track in tracks:
+
+                artists = track["artists"]
+                track_artists = ""
+                for artist in artists:
+                    if artist == artists[0]:
+                        track_artists = track_artists + f"{artist['name']}"
+                    else:
+                        track_artists = track_artists + f", {artist['name']}"
+                
+                track_instance = Track(
+                    spotify_id = track["id"],
+                    title = track["name"],
+                    popularity = 0,
+                    duration_ms = track["duration_ms"],
+                    album_title = album_json["name"],
+                    album_spotify_id = album_json["id"],
+                    artists = track_artists
+                )
+                dao_save_track(track_instance) 
+
+def extract_several_tracks_info(auth: SpotifyAuthManager) -> None:
     
-    for album_json in albums_json[0]:
-        dao_update_album(album_json["id"], album_json["popularity"], album_json["tracks"]["total"])
-
-        tracks = album_json["tracks"]["items"]
-        for track in tracks:
-
-            artists = track["artists"]
-            track_artists = ""
-            for artist in artists:
-                if artist == artists[0]:
-                    track_artists = track_artists + f"{artist['name']}"
-                else:
-                    track_artists = track_artists + f", {artist['name']}"
-            
-            track_instance = Track(
-                spotify_id = track["id"],
-                title = track["name"],
-                popularity = 0,
-                duration_ms = track["duration_ms"],
-                album_title = album_json["name"],
-                album_spotify_id = album_json["id"],
-                artists = track_artists
-            )
-            dao_save_track(track_instance) 
-
-def extract_several_tracks_info(headers:str) -> None:
+    print("Extracting tracks information.")
     all_tracks = dao_get_all_tracks()
     tracks_ids = []
 
@@ -124,11 +159,12 @@ def extract_several_tracks_info(headers:str) -> None:
 
         tracks_ids.append(tracks_ids_str)
 
-    tracks_json = Parallel(n_jobs=N_JOBS)(
-        delayed(get_several_track_information)(headers, id)
+    tracks_json_list = Parallel(n_jobs=N_JOBS)(
+        delayed(get_several_track_information)(auth, id)
         for id in 
         tqdm(tracks_ids)
     )
 
-    for track_json in tracks_json[0]:
-        dao_update_track(track_json["id"], track_json["popularity"])
+    for list in tracks_json_list:
+        for track_json in list:
+            dao_update_track(track_json["id"], track_json["popularity"])

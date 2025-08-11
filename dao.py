@@ -9,7 +9,7 @@ def dao_get_all_artists() -> List[Artist]:
         artists = session.exec(statement).all()
         return artists
 
-def dao_artist_is_in_db(artist_id: str) -> Artist:
+def dao_fetch_artist(artist_id: str) -> Artist:
     with Session(engine) as session:
         existing_artist = session.exec(
             select(Artist).where(Artist.spotify_id == artist_id)
@@ -21,7 +21,7 @@ def dao_artist_is_in_db(artist_id: str) -> Artist:
 
 def dao_save_artist(artist: Artist) -> None:
     with Session(engine) as session:
-        if not dao_artist_is_in_db(artist.spotify_id):
+        if not dao_fetch_artist(artist.spotify_id):
             session.add(artist)       
         session.commit()
 
@@ -31,7 +31,7 @@ def dao_get_all_albums() -> List[Album]:
         albums = session.exec(statement).all()
         return albums
 
-def dao_album_is_in_db(album_id: str) -> Album:
+def dao_fetch_album(album_id: str) -> Album:
     with Session(engine) as session:
         existing_album = session.exec(
             select(Album).where(Album.spotify_id == album_id)
@@ -43,13 +43,13 @@ def dao_album_is_in_db(album_id: str) -> Album:
 
 def dao_save_album(album: Album) -> None:
     with Session(engine) as session:
-        if not dao_album_is_in_db(album.spotify_id):
+        if not dao_fetch_album(album.spotify_id):
             session.add(album)       
         session.commit()
 
 def dao_update_album(album_id: str, album_popularity, album_tracks) -> None:
     with Session(engine) as session:
-        selected_album = dao_album_is_in_db(album_id)
+        selected_album = dao_fetch_album(album_id)
         selected_album.popularity = album_popularity
         selected_album.tracks = album_tracks        
         session.add(selected_album)
@@ -61,7 +61,7 @@ def dao_get_all_tracks() -> List[Track]:
         tracks = session.exec(statement).all()
         return tracks
 
-def dao_track_is_in_db(track_id: str) -> Track:
+def dao_fetch_track(track_id: str) -> Track:
     with Session(engine) as session:
         existing_track = session.exec(
             select(Track).where(Track.spotify_id == track_id)
@@ -73,13 +73,13 @@ def dao_track_is_in_db(track_id: str) -> Track:
         
 def dao_save_track(track: Track) -> None:
     with Session(engine) as session:
-        if not dao_track_is_in_db(track.spotify_id):
+        if not dao_fetch_track(track.spotify_id):
             session.add(track)       
         session.commit()
 
 def dao_update_track(track_id: str, track_popularity: int) -> None:
     with Session(engine) as session:
-        selected_track = dao_track_is_in_db(track_id)
+        selected_track = dao_fetch_track(track_id)
         selected_track.popularity = track_popularity
         session.add(selected_track)
         session.commit()

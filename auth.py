@@ -1,33 +1,46 @@
 import os
+import time
+import requests
 from dotenv import load_dotenv
-import base64
-from requests import post
-import json
 
-def get_token():
-    #Loading .env file and extracting client ID and client secret
-    load_dotenv()
-    client_id: str = os.getenv("CLIENT_ID")
-    client_secret: str = os.environ.get("CLIENT_SECRET")
-    
-    #Preparting client ID and client secret to be sent in the right format(base 64)
-    auth_string = client_id + ":" + client_secret
-    auth_bytes = auth_string.encode("utf-8")
-    auth_base64 = str(base64.b64encode(auth_bytes), "utf-8")
+load_dotenv()
 
-    url = "https://accounts.spotify.com/api/token"
-    headers = {
-        "Authorization":"Basic " + auth_base64,
-        "Content-Type":"application/x-www-form-urlencoded"
-    }
-    data = {"grant_type":"client_credentials"}
+class SpotifyAuthManager:
+    def __init__(self):
+        self.client_id = os.getenv("CLIENT_ID")
+        self.client_secret = os.getenv("CLIENT_SECRET")
+        self.token = None
+        self.token_expires_at = 0
 
-    result = post(url, headers=headers, data=data)
-    json_result = json.loads(result.content)
-    token = json_result["access_token"]
+    def _request_token(self):
+        url = "https://accounts.spotify.com/api/token"
+        data = {"grant_type": "client_credentials"}
+        headers = {
+            "Authorization": f"Basic {self._encode_credentials()}"
+        }
 
-    return token
+        response = requests.post(url, data=data, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to get token: {response.status_code} - {response.text}")
 
-def get_auth_header(token):
-    #Create a header from the token
-    return {"Authorization":"Bearer " + token}
+        result = response.json()
+        self.token = result["access_token"]
+        self.token_expires_at = time.time() + result["expires_in"] - 10  # renew a few seconds early
+
+    def _encode_credentials(self):
+        import base64
+        raw = f"{self.client_id}:{self.client_secret}"
+        return base64.b64encode(raw.encode()).decode()
+
+    def get_token(self) -> str:
+        if self.token is None or time.time() >= self.token_expires_at:
+            self._request_token()
+        return self.token
+
+    def refresh_token(self) -> None:
+        self._request_token()
+
+    def get_headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.get_token()}"
+        }
